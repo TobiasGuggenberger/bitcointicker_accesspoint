@@ -1,18 +1,23 @@
 #include <Arduino.h>
-#include <ESP8266WiFi.h> 
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266HTTPClient.h> 
+#include <AutoConnect.h>
 #include <ArduinoOTA.h>
 #include <ArduinoJson.h>
 #include <WiFiClientSecureBearSSL.h>
-//#include <WiFiClientSecure.h>
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
-//#include <SPI.h>
-#include <ESP8266HTTPClient.h> 
 #include <NTPClient.h>
 // Config laden
-#include <config.h>
+//#include <config.h>
 // BTC Logo laden
 #include <btclogo.h>
+
+ESP8266WebServer Server;
+
+AutoConnect       Portal(Server);
+AutoConnectConfig Config;       // Enable autoReconnect supported on v0.9.4
 
 
 /////////////////////////////////////////////////////////////////////////// TFT
@@ -59,6 +64,27 @@ void loop                      ();
 void tft_text                  (int x, int y, int size, char *text, uint16_t color);
 void btc_kurs                  ();
 void ntp_zeit                  ();
+void rootPage                  ();
+
+
+void rootPage() {
+  String  content =
+    "<html>"
+    "<head>"
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+    "</head>"
+    "<body>"
+    "<h2 align=\"center\" style=\"color:blue;margin:20px;\">Bitcoin Ticker</h2>"
+    "<h3 align=\"center\" style=\"color:gray;margin:10px;\">Version 1.2</h3>"
+    "<p style=\"text-align:center;\">info@zurzy.shop</p>"
+    "<p style=\"text-align:center;\"><a href=\"../_ac\">Einstellungen aendern</a></p>"
+    "<p></p><p style=\"padding-top:15px;text-align:center\">" AUTOCONNECT_LINK(COG_24) "</p>"
+    "</body>"
+    "</html>";
+
+   Server.send(200, "text/html", content);
+
+}
 
 void setup() {
 
@@ -70,46 +96,42 @@ void setup() {
   // Serielle Kommunikation starten
   Serial.begin(115200);
 
-
-  /////////////////////////////////////////////////////////////////////////// TFT initialisieren
+  // TFT initialisieren
   tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
-  
+
+  // AutoConnect Setup
+  Config.autoReconnect = true;
+  Config.hostName = "esp32-01";
+    Portal.config(Config);
+  Server.on("/", rootPage);
+
   // TFT einfärben
-  tft.fillScreen(BLACK); 
 
+   // Meldung ausgeben
+   tft.fillScreen(BLACK); 
+   tft.setCursor(1,20);
+   tft.setTextColor(YELLOW,BLACK);
+   tft.setTextSize(1);
+   tft.print("Access Point erzeugt");
 
-  // Verbindung zum WiFI aufbauen
+  // Establish a connection with an autoReconnect option.
+  if (Portal.begin()) {
 
-  Serial.print("Verbindung zu SSID -> ");
-  Serial.println(ssid);
+   // Meldung ausgeben
+   tft.setCursor(1,80);
+   tft.setTextColor(YELLOW,BLACK);
+   tft.setTextSize(1);
+   tft.print("Wifi Verbunden");
 
-  // WiFi 
-  IPAddress ip(192, 168, 1, 100);
-	IPAddress dns(192, 168, 1, 2);  
-	IPAddress subnet(255, 255, 0, 0);
-	IPAddress gateway(192, 168, 1, 2);
+   tft.setCursor(1,100);
+   tft.setTextColor(YELLOW,BLACK);
+   tft.setTextSize(1);
+   tft.print(WiFi.localIP().toString());
 
-	WiFi.config(ip, dns, gateway, subnet);
-  
-  WiFi.begin(ssid, password);
-
-  // Wifi AP deaktivieren
-  WiFi.mode(WIFI_STA);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(200);
-   
-   tft.setCursor(5,40);
-   tft.setTextColor(RED,BLACK);
-   tft.setTextSize(2);
-   tft.print("Suche Wlan");
-  
+    Serial.println("WiFi connected: " + WiFi.localIP().toString());
+    Serial.println(WiFi.hostname());
   }
-  Serial.println("");
-  Serial.println("Erfolgreich mit dem WiFi verbunden!");
-  Serial.println(WiFi.localIP());
-  Serial.print("SSID : ");
-  Serial.println(ssid);
+
 
   tft.fillScreen(BLACK); 
 
